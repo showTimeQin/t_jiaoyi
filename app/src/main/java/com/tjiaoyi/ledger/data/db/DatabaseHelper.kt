@@ -7,6 +7,7 @@ import android.database.sqlite.SQLiteDatabase
 import android.database.sqlite.SQLiteOpenHelper
 import com.tjiaoyi.ledger.data.model.ALL_ACCOUNTS_ID
 import com.tjiaoyi.ledger.data.model.Account
+import com.tjiaoyi.ledger.data.model.CLOSED_TRADE_ORDER
 import com.tjiaoyi.ledger.data.model.Currency
 import com.tjiaoyi.ledger.data.model.DEFAULT_ACCOUNT_NAME
 import com.tjiaoyi.ledger.data.model.FX_NOTE_EXCHANGE
@@ -577,18 +578,13 @@ class DatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME
             )
 
     /**
-     * 详情页第二档：**已T**，按卖出时间从近到远。
-     *
-     * 卖出日期相同时按买入时间从近到远，再相同按 id 倒序，保证顺序稳定。
+     * 详情页第二档：**已T**。排序规则见 [CLOSED_TRADE_ORDER]：
+     * 卖出日期从近到远，同一天按卖出价从高到低。
      */
     fun getClosedTrades(stockId: Long): List<Trade> =
         getTradesByStockId(stockId)
             .filter { it.isClosed }
-            .sortedWith(
-                compareByDescending<Trade> { parseDateOrNull(it.sellTime) ?: 0L }
-                    .thenByDescending { parseDateOrNull(it.buyTime) ?: 0L }
-                    .thenByDescending { it.id }
-            )
+            .sortedWith(CLOSED_TRADE_ORDER)
 
     private fun readTrade(cursor: Cursor) = Trade(
         id = cursor.getLong(cursor.getColumnIndexOrThrow(COLUMN_ID)),

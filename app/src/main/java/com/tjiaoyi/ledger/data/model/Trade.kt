@@ -145,3 +145,20 @@ data class Trade(
         return (profit / buyCost) / (days / 365.0) * 100.0
     }
 }
+
+/**
+ * 详情页「已T」列表的展示顺序：
+ * 1. 卖出日期从近到远（老数据可能带时刻，先归一到当天 0 点，同一天才算同一档）；
+ * 2. **同一天按卖出价从高到低**；
+ * 3. 仍相同则按买入日期从近到远、id 倒序兜底，保证顺序稳定。
+ *
+ * 卖出价取库里的人民币口径（港币录入的记录落库时已折算），与卡片主显示的价格一致。
+ * 单只股票详情与「总账户」合并视图共用这一个比较器，避免两处规则走偏。
+ */
+val CLOSED_TRADE_ORDER: Comparator<Trade> =
+    compareByDescending<Trade> {
+        parseDateOrNull(it.sellTime)?.let { millis -> startOfDay(millis) } ?: 0L
+    }
+        .thenByDescending { it.sellPrice ?: 0.0 }
+        .thenByDescending { parseDateOrNull(it.buyTime) ?: 0L }
+        .thenByDescending { it.id }

@@ -44,6 +44,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.tjiaoyi.ledger.data.db.DatabaseHelper
+import com.tjiaoyi.ledger.data.model.CLOSED_TRADE_ORDER
 import com.tjiaoyi.ledger.data.model.Stock
 import com.tjiaoyi.ledger.data.model.StockStat
 import com.tjiaoyi.ledger.data.model.Stats
@@ -95,12 +96,9 @@ fun StockDetailScreen(
                     .thenBy { parseDateOrNull(it.buyTime) ?: 0L }
                     .thenBy { it.id }
             )
+        // 汇总视图要把多只股票的记录重新合起来排一次，规则与单只详情一致
         closedTrades = groupIds.flatMap { databaseHelper.getClosedTrades(it) }
-            .sortedWith(
-                compareByDescending<Trade> { parseDateOrNull(it.sellTime) ?: 0L }
-                    .thenByDescending { parseDateOrNull(it.buyTime) ?: 0L }
-                    .thenByDescending { it.id }
-            )
+            .sortedWith(CLOSED_TRADE_ORDER)
         stat = Stats.ofStock(stockId, groupIds.flatMap { databaseHelper.getTradesByStockId(it) })
     }
 
@@ -231,13 +229,13 @@ fun StockDetailScreen(
                 }
             }
 
-            // ---------------------------------------------------- 第二档：已T（卖出时间从近到远）
+            // ------------------------------ 第二档：已T（卖出时间近到远，同日按卖出价高到低）
             if (closedTrades.isNotEmpty()) {
                 item(key = "closed_header") {
                     SectionHeader(
                         title = "已T",
                         count = closedTrades.size,
-                        hint = "按卖出时间从近到远"
+                        hint = "按卖出时间近到远 · 同日按价高到低"
                     )
                 }
                 items(closedTrades, key = { "closed_${it.id}" }) { trade ->
