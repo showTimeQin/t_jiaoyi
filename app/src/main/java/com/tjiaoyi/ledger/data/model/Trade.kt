@@ -147,6 +147,17 @@ data class Trade(
 }
 
 /**
+ * 详情页第一档「未出T」的展示顺序：买入价从低到高 → 买入日期从早到晚 → id 兜底。
+ *
+ * 抽出来和 [CLOSED_TRADE_ORDER] 对称：库里查、详情页合并按代码汇总、
+ * 以及「按港币显示」时折完重排，三处都用同一个规则。
+ */
+val OPEN_TRADE_ORDER: Comparator<Trade> =
+    compareBy<Trade> { it.buyPrice }
+        .thenBy { parseDateOrNull(it.buyTime) ?: 0L }
+        .thenBy { it.id }
+
+/**
  * 详情页「已T」列表的展示顺序：
  * 1. 卖出日期从近到远（老数据可能带时刻，先归一到当天 0 点，同一天才算同一档）；
  * 2. **同一天按卖出价从高到低**；

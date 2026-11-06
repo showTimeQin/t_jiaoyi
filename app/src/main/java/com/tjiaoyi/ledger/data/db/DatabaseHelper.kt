@@ -12,6 +12,7 @@ import com.tjiaoyi.ledger.data.model.Currency
 import com.tjiaoyi.ledger.data.model.DEFAULT_ACCOUNT_NAME
 import com.tjiaoyi.ledger.data.model.FX_NOTE_EXCHANGE
 import com.tjiaoyi.ledger.data.model.FxRate
+import com.tjiaoyi.ledger.data.model.OPEN_TRADE_ORDER
 import com.tjiaoyi.ledger.data.model.Stock
 import com.tjiaoyi.ledger.data.model.StockType
 import com.tjiaoyi.ledger.data.model.Trade
@@ -565,17 +566,13 @@ class DatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME
     }
 
     /**
-     * 详情页第一档：**未出T**，按买入价从低到高。
-     * 价格相同时按买入时间从早到晚，保证顺序稳定。
+     * 详情页第一档：**未出T**，排序规则见 [OPEN_TRADE_ORDER]：
+     * 买入价从低到高，价格相同按买入时间从早到晚。
      */
     fun getOpenTrades(stockId: Long): List<Trade> =
         getTradesByStockId(stockId)
             .filter { !it.isClosed }
-            .sortedWith(
-                compareBy<Trade> { it.buyPrice }
-                    .thenBy { parseDateOrNull(it.buyTime) ?: 0L }
-                    .thenBy { it.id }
-            )
+            .sortedWith(OPEN_TRADE_ORDER)
 
     /**
      * 详情页第二档：**已T**。排序规则见 [CLOSED_TRADE_ORDER]：

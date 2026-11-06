@@ -29,6 +29,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.tjiaoyi.ledger.data.model.Currency
 import com.tjiaoyi.ledger.data.model.Trade
 import com.tjiaoyi.ledger.data.model.fxText
 import com.tjiaoyi.ledger.ui.theme.ClosedBadgeColor
@@ -51,6 +52,9 @@ import com.tjiaoyi.ledger.ui.theme.OpenBadgeColor
  * │  +¥1,190.00      2天             5712.5% │
  * └──────────────────────────────────────────┘
  * ```
+ *
+ * [trade] 里的数字按 [displayCurrency] 解释：人民币是库里的原生口径（默认），
+ * 港币口径由 [HkdDisplay] 先折好再传进来，卡片只负责带上对应的符号。
  */
 @Composable
 fun TradeCard(
@@ -59,8 +63,10 @@ fun TradeCard(
     onEditClick: () -> Unit,
     onDeleteClick: () -> Unit,
     modifier: Modifier = Modifier,
-    showActions: Boolean = true
+    showActions: Boolean = true,
+    displayCurrency: Currency = Currency.CNY
 ) {
+    val hkd = displayCurrency == Currency.HKD
     Card(
         modifier = modifier.fillMaxWidth(),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
@@ -109,9 +115,9 @@ fun TradeCard(
                 SideColumn(
                     title = "买入",
                     titleColor = MaterialTheme.colorScheme.primary,
-                    price = priceText(trade.buyPrice),
-                    amount = money(trade.buyAmount),
-                    fee = money(trade.buyFee),
+                    price = priceText(trade.buyPrice, displayCurrency),
+                    amount = money(trade.buyAmount, displayCurrency),
+                    fee = money(trade.buyFee, displayCurrency),
                     time = dateOnly(trade.buyTime),
                     modifier = Modifier.weight(1f)
                 )
@@ -128,9 +134,9 @@ fun TradeCard(
                 SideColumn(
                     title = "卖出",
                     titleColor = if (trade.isClosed) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                    price = if (trade.isClosed) priceText(trade.sellPrice ?: 0.0) else "—",
-                    amount = if (trade.isClosed) money(trade.sellAmount ?: 0.0) else "—",
-                    fee = if (trade.isClosed) money(trade.sellFee ?: 0.0) else "—",
+                    price = if (trade.isClosed) priceText(trade.sellPrice ?: 0.0, displayCurrency) else "—",
+                    amount = if (trade.isClosed) money(trade.sellAmount ?: 0.0, displayCurrency) else "—",
+                    fee = if (trade.isClosed) money(trade.sellFee ?: 0.0, displayCurrency) else "—",
                     time = trade.sellTime?.takeIf { it.isNotBlank() }?.let { dateOnly(it) } ?: "尚未卖出",
                     modifier = Modifier.weight(1f)
                 )
@@ -149,7 +155,7 @@ fun TradeCard(
             ) {
                 BottomCell(
                     label = "盈利",
-                    value = if (trade.isClosed) signedMoney(trade.profit) else "—",
+                    value = if (trade.isClosed) signedMoney(trade.profit, displayCurrency) else "—",
                     valueColor = if (trade.isClosed) profitColor(trade.profit) else MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.weight(1.2f)
                 )
@@ -167,8 +173,22 @@ fun TradeCard(
                 )
             }
 
-            // 按港币录入的记录：主显示仍是人民币，这里补一行原始港币数字方便对交割单
-            if (trade.isHkdInput) {
+            // 币种说明。人民币口径下保留「原按港币填」那两行，方便和交割单对；
+            // 港币口径下主数字本身就是港币，改成说明这个数是按哪个汇率来的。
+            if (hkd) {
+                Spacer(modifier = Modifier.height(8.dp))
+                val from = if (trade.isHkdInput) "原按港币填" else "按结算汇率折成港币"
+                val rates = if (trade.isClosed) {
+                    "　买 ${fxText(trade.buyFxRate)} · 卖 ${fxText(trade.sellFxRate)}"
+                } else {
+                    "　买 ${fxText(trade.buyFxRate)}"
+                }
+                Text(
+                    text = "$from$rates（1 港币 = ? 元）",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            } else if (trade.isHkdInput) {
                 Spacer(modifier = Modifier.height(8.dp))
                 val originalText = if (trade.isClosed) {
                     "原按港币填　买 ${priceText(trade.buyPriceOriginal ?: 0.0)}" +
