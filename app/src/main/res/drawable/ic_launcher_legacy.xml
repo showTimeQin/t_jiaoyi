@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- 蓝色圆形背景 -->
+    <item>
+        <shape android:shape="oval">
+            <solid android:color="#1565C0" />
+            <size android:width="48dp" android:height="48dp" />
+        </shape>
+    </item>
+    <!-- 白色 T + 红色上涨箭头 -->
+    <item
+        android:left="8dp"
+        android:top="8dp"
+        android:right="8dp"
+        android:bottom="8dp">
+        <vector
+            android:width="32dp"
+            android:height="32dp"
+            android:viewportWidth="32"
+            android:viewportHeight="32">
+            <path
+                android:fillColor="#FFFFFF"
+                android:pathData="M8.3,10 L16,10 L16,12.4 L8.3,12.4 Z" />
+            <path
+                android:fillColor="#FFFFFF"
+                android:pathData="M11,10 L13.4,10 L13.4,23.2 L11,23.2 Z" />
+            <path
+                android:fillColor="#FF5252"
+                android:pathData="M18.5,16.6 L20.8,16.6 L20.8,23.8 L18.5,23.8 Z" />
+            <path
+                android:fillColor="#FF5252"
+                android:pathData="M16.6,17.3 L22.6,17.3 L19.6,12.2 Z" />
+        </vector>
+    </item>
+</layer-list>
