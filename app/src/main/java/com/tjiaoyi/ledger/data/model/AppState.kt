@@ -17,9 +17,12 @@ object AppState {
 
     private const val KEY_FEE_PREFIX = "fee_"
     private const val KEY_FEE_VERSION = "fee_config_version"
-    private const val FEE_CONFIG_VERSION = 3
+    private const val FEE_CONFIG_VERSION = 4
     /** 1.5 里误用过的港股通汇率、以及 1.6.0 里为凑交割单反推的拟合汇率 */
     private val OLD_HK_FX_DEFAULTS = floatArrayOf(0.8527f, 0.9435f)
+    /** 1.6 及之前照券商公示标准填的港股通佣金默认值，20 笔实收证明对不上（详见 FeeConfig 注释） */
+    private const val OLD_HK_COMMISSION_DEFAULT = 0.00025
+    private const val OLD_HK_MIN_COMMISSION_DEFAULT = 5.0
 
     /** 当前选中的账户，ALL_ACCOUNTS_ID 表示总账户（只读汇总）。 */
     var selectedAccountId: Long by mutableStateOf(ALL_ACCOUNTS_ID)
@@ -53,6 +56,10 @@ object AppState {
      * 降级成「查不到任何日期数据时的离线兜底」，默认值也从拟合值 0.9435
      * 改成内置表最后一个交易日的真实值 0.85086。
      *
+     * 1.7 起港股通佣金默认值从万2.5 + 最低 5 元改成万1.5 + 最低 1 元：
+     * 前者是券商公示标准，20 笔东财港股通持仓明细逐笔对不上（每笔多算 3.2~4.0 元），
+     * 后者逐笔最大偏差 0.02 元。
+     *
      * 老用户 prefs 里存着历史默认值时会让兜底值不对，所以升级一次：
      * 只有当保存值恰好等于某个历史默认（说明用户没手动改过）时才替换，
      * 其它自定义费率和汇率全部保留。
@@ -64,7 +71,30 @@ object AppState {
         if (savedFx > 0f && OLD_HK_FX_DEFAULTS.any { kotlin.math.abs(savedFx - it) < 0.0001f }) {
             editor.putFloat(KEY_FEE_PREFIX + "hk_fx", FeeConfig().hkFxRate.toFloat())
         }
+        val defaults = FeeConfig()
+        replaceIfStillDefault(editor, prefs, "hk_commission", OLD_HK_COMMISSION_DEFAULT, defaults.hkCommissionRate)
+        replaceIfStillDefault(editor, prefs, "hk_min", OLD_HK_MIN_COMMISSION_DEFAULT, defaults.hkMinCommission)
         editor.putInt(KEY_FEE_VERSION, FEE_CONFIG_VERSION).apply()
+    }
+
+    /**
+     * 保存值恰好等于旧默认（说明用户没手动改过）时才换成新默认，其它一律保留。
+     * SharedPreferences 只存 Float，先按 [readFeeConfig] 同样的口径收敛噪声再比，
+     * 否则 0.00025 读回来是 0.0002500000106，比不出「等于旧默认」。
+     */
+    private fun replaceIfStillDefault(
+        editor: android.content.SharedPreferences.Editor,
+        prefs: android.content.SharedPreferences,
+        key: String,
+        oldDefault: Double,
+        newDefault: Double
+    ) {
+        if (!prefs.contains(KEY_FEE_PREFIX + key)) return
+        val raw = prefs.getFloat(KEY_FEE_PREFIX + key, 0f).toDouble()
+        val saved = kotlin.math.round(raw * 1e10) / 1e10
+        if (kotlin.math.abs(saved - oldDefault) < 1e-12) {
+            editor.putFloat(KEY_FEE_PREFIX + key, newDefault.toFloat())
+        }
     }
 
     fun saveFeeConfig(context: Context, config: FeeConfig) {

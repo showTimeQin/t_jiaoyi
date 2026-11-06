@@ -11,7 +11,7 @@ android {
         applicationId = "com.tjiaoyi.ledger"
         minSdk = 24
         targetSdk = 34
-        versionCode = 14
+        versionCode = 15
         versionName = "1.3"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
