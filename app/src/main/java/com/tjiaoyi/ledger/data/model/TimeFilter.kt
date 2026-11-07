@@ -37,6 +37,7 @@ sealed interface TimeFilter {
     object All : TimeFilter
 
     companion object {
+        val LastMonth = LastMonths(1)
         val LastYear = LastMonths(12)
         val LastHalfYear = LastMonths(6)
         val LastQuarter = LastMonths(3)
@@ -53,6 +54,7 @@ val TimeFilter.label: String
             12 -> "近一年"
             6 -> "近半年"
             3 -> "近三月"
+            1 -> "近一月"
             else -> "近${months}个月"
         }
         is TimeFilter.Year -> "${year}年"
@@ -72,6 +74,7 @@ val TimeFilter.rateLabel: String
             12 -> "年利率"
             6 -> "近半年收益率"
             3 -> "近三月收益率"
+            1 -> "近一月收益率"
             else -> "收益率"
         }
         is TimeFilter.Year -> "年度收益率"

@@ -1,5 +1,7 @@
 package com.tjiaoyi.ledger.data.model
 
+import java.util.Calendar
+
 /**
  * 一只股票的汇总指标。首页卡片和详情页头部用它。
  *
@@ -45,6 +47,23 @@ data class WindowStat(
     val rate: Double? get() = if (peakOccupied > 0.0) profit / peakOccupied * 100.0 else null
 
     /** 区间胜率 = 区间内已T中盈利笔数 ÷ 区间内已T笔数 */
+    val winRate: Double? get() = if (closedCount > 0) winCount * 100.0 / closedCount else null
+}
+
+/**
+ * 月度盈利柱状图的一根柱子：一个自然月里卖出的那些已T记录。
+ *
+ * [profit] 与统计页顶部的「盈利」同口径（按**卖出日期**归属），所以各月之和
+ * 正好等于区间盈利；一个月一笔没卖时是 0，不是缺席。
+ */
+data class MonthBucket(
+    val year: Int,
+    val month: Int,
+    val profit: Double = 0.0,
+    val closedCount: Int = 0,
+    val winCount: Int = 0
+) {
+    /** 当月胜率 = 当月盈利笔数 ÷ 当月已T笔数；一笔没卖时为 null，显示「—」 */
     val winRate: Double? get() = if (closedCount > 0) winCount * 100.0 / closedCount else null
 }
 
@@ -102,6 +121,65 @@ object Stats {
             peakOccupied = peakOccupied(trades, range, now)
         )
     }
+
+    /**
+     * 区间内按月拆开的盈利，统计页柱状图用。
+     *
+     * 归属规则和 [window] 完全一致：只算**卖出日期落在区间内**的已T记录，
+     * 一笔记录整个人的盈利进它卖出的那个月，不做跨月摊分。因此各月 [MonthBucket.profit]
+     * 之和 == [WindowStat.profit]，图上看的和上面卡片里的对得上。
+     *
+     * 月份是**连续铺开**的：区间跨 12 个月就固定 12 根柱子，一笔没卖的月份也是一根 0，
+     * 这样横轴是真时间轴，不会因为某月空着就把相邻两个月挤到一起。
+     * 区间尾端超过今天的部分不生成月份（和 [peakOccupied] 一样，未来不模拟）——
+     * 11 月里选「2026 年」是 11 根柱子，不是 12 根空着一根；选已经过完的 2025 年才是 12 根。
+     */
+    fun monthlyProfit(
+        trades: List<Trade>,
+        range: DateRange,
+        now: Long = System.currentTimeMillis()
+    ): List<MonthBucket> {
+        val from = startOfDay(range.startMillis)
+        val to = startOfDay(minOf(range.endMillis, now))
+        if (to < from) return emptyList()
+
+        val keys = ArrayList<Pair<Int, Int>>()
+        val cal = Calendar.getInstance().apply {
+            timeInMillis = from
+            set(Calendar.DAY_OF_MONTH, 1)
+        }
+        while (true) {
+            keys += cal.get(Calendar.YEAR) to (cal.get(Calendar.MONTH) + 1)
+            cal.add(Calendar.MONTH, 1)
+            if (cal.timeInMillis > to) break
+        }
+
+        val profit = HashMap<Long, Double>()
+        val closed = HashMap<Long, Int>()
+        val wins = HashMap<Long, Int>()
+        for (trade in trades) {
+            val sell = parseDateOrNull(trade.sellTime) ?: continue
+            if (sell !in range) continue
+            val key = monthKey(yearOf(sell), monthOf(sell))
+            profit[key] = (profit[key] ?: 0.0) + trade.profit
+            closed[key] = (closed[key] ?: 0) + 1
+            if (trade.isWin) wins[key] = (wins[key] ?: 0) + 1
+        }
+
+        return keys.map { (year, month) ->
+            val key = monthKey(year, month)
+            MonthBucket(
+                year = year,
+                month = month,
+                profit = profit[key] ?: 0.0,
+                closedCount = closed[key] ?: 0,
+                winCount = wins[key] ?: 0
+            )
+        }
+    }
+
+    /** 年 + 月压成一个 Long 当 map 的键，省掉 Pair 装箱 */
+    private fun monthKey(year: Int, month: Int): Long = year.toLong() * 100 + month
 
     /**
      * 区间内巅峰占用资金。
